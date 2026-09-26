@@ -55,7 +55,7 @@ public final class Analyzer {
             return new Report(1, 0, List.of("<pasted>"), findings);
         }
         scan(result.getResult().get(), "<pasted>", findings);
-        return new Report(1, 1, List.of(), findings);
+       return new Report(1, 1, List.of(), findings, "not detected");
     }
 
     private void scan(CompilationUnit cu, String file, List<Finding> out) {
