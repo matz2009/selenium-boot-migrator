@@ -22,6 +22,7 @@ public record Report(int filesFound, int filesParsed, List<String> unparsable, L
         StringBuilder sb = new StringBuilder("Selenium Boot Migration Analysis\n\n");
         sb.append(String.format("Files found:              %d%n", filesFound));
         sb.append(String.format("Files parsed:             %d%n", filesParsed));
+        sb.append(String.format("%nDetected technologies:   %s%n", technologies));
         Map<String, Long> byRule = new TreeMap<>();
         findings.forEach(f -> byRule.merge(f.ruleId(), 1L, Long::sum));
         byRule.forEach((r, n) -> sb.append(String.format("%-25s %d%n", r + ":", n)));
