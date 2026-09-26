@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-public record Report(int filesFound, int filesParsed, List<String> unparsable, List<Finding> findings) {
+public record Report(int filesFound, int filesParsed, List<String> unparsable, List<Finding> findings, String technologies) {
 
     public long count(Finding.Status s) {
         return findings.stream().filter(f -> f.status() == s).count();
