@@ -2,6 +2,8 @@ package com.seleniumboot.migrator;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -56,5 +58,54 @@ class AnalyzerTest {
     void unparsableSourceIsReportedNotThrown() {
         var report = new Analyzer().analyzeSource("class {{{");
         assertEquals(1, report.unparsable().size());
+    }
+
+    @Test
+    void detectsMavenAndTechnologies() throws Exception {
+        Path temp = Files.createTempDirectory("selenium-test");
+
+        Files.writeString(temp.resolve("pom.xml"), """
+            <project>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.seleniumhq.selenium</groupId>
+                        <artifactId>selenium-java</artifactId>
+                        <version>4.20.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.testng</groupId>
+                        <artifactId>testng</artifactId>
+                        <version>7.10.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter</artifactId>
+                        <version>5.10.2</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>io.github.bonigarcia</groupId>
+                        <artifactId>webdrivermanager</artifactId>
+                        <version>5.8.0</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """);
+
+        var report = new Analyzer().analyze(temp);
+
+        assertTrue(report.render().contains("Maven"));
+        assertTrue(report.render().contains("Selenium 4.20.0"));
+        assertTrue(report.render().contains("TestNG"));
+        assertTrue(report.render().contains("JUnit 5"));
+        assertTrue(report.render().contains("WebDriverManager"));
+    }
+
+    @Test
+    void missingPomIsNotDetected() throws Exception {
+        Path temp = Files.createTempDirectory("selenium-test");
+
+        var report = new Analyzer().analyze(temp);
+
+        assertTrue(report.render().contains("not detected"));
     }
 }
