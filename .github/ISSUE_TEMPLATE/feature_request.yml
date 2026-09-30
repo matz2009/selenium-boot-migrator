@@ -1,0 +1,33 @@
+name: "✨ Feature / rule request"
+description: Suggest a new migration rule or improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most feature requests here are new `MIG-xxx` detection rules. See "Adding a rule" in
+        the README for how a rule is structured.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The pattern
+      description: What existing-code pattern should be detected, and what's the current gap?
+      placeholder: "Projects using @Listeners(RetryListener.class) aren't flagged by any existing rule."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested change
+      description: What should the tool report, and what's the recommended Selenium Boot equivalent?
+      placeholder: "Detect @Listeners(RetryListener.class) and suggest the retry: config block, same as MIG-004."
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: The suggested mapping exists in the Selenium Boot docs (or I've noted where it doesn't)
+        - label: Detection can be done via AST analysis, not an AI-generated transformation

@@ -1,0 +1,8 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    implementation 'org.seleniumhq.selenium:selenium-java:4.21.0'
+    testImplementation 'org.testng:testng:7.10.2'
+}

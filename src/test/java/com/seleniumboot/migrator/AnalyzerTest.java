@@ -1,6 +1,7 @@
 package com.seleniumboot.migrator;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +10,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AnalyzerTest {
+
+    private static Path fixture(String name) throws URISyntaxException {
+        return Path.of(AnalyzerTest.class.getResource("/" + name).toURI());
+    }
 
     private static List<String> rules(String src) {
         return new Analyzer().analyzeSource(src).findings().stream().map(Finding::ruleId).toList();
@@ -24,6 +29,58 @@ class AnalyzerTest {
         assertTrue(r.contains("MIG-001"));
         assertTrue(r.contains("MIG-002"));
         assertTrue(r.contains("MIG-015"));
+    }
+
+    @Test
+    void detectsTestNgDriverLifecycleMethods() throws Exception {
+        var findings = new Analyzer().analyze(fixture("lifecycle-testng")).findings().stream()
+                .filter(finding -> finding.ruleId().equals("MIG-017")).toList();
+        assertEquals(7, findings.size());
+        assertTrue(findings.stream().allMatch(finding -> finding.advice().contains(
+                "Delete the lifecycle glue; extend BaseTest. Driver creation, per-thread isolation, and teardown are handled for you.")));
+    }
+
+    @Test
+    void detectsJunit4DriverLifecycleMethods() throws Exception {
+        var findings = new Analyzer().analyze(fixture("lifecycle-junit4")).findings().stream()
+                .filter(finding -> finding.ruleId().equals("MIG-017")).toList();
+        assertEquals(3, findings.size());
+        assertTrue(findings.stream().allMatch(finding -> finding.advice().contains("extend BaseTest")));
+    }
+
+    @Test
+    void detectsJunit5DriverLifecycleMethods() throws Exception {
+        var findings = new Analyzer().analyze(fixture("lifecycle-junit5")).findings().stream()
+                .filter(finding -> finding.ruleId().equals("MIG-017")).toList();
+        assertEquals(4, findings.size());
+        assertTrue(findings.stream().allMatch(finding -> finding.advice().contains("extend BaseTest")));
+    }
+
+    @Test
+    void ignoresLifecycleMethodsWithoutDriverSetupOrTeardown() {
+        var report = new Analyzer().analyzeSource("class BaseTest { @BeforeEach void setUp() { prepareData(); } }");
+        assertFalse(report.findings().stream().anyMatch(finding -> finding.ruleId().equals("MIG-017")));
+    }
+
+    @Test
+    void mixedLifecycleMethodRequiresManualReview() {
+        var finding = new Analyzer().analyzeSource("""
+                class BaseTest {
+                    @AfterEach void tearDown() {
+                        driver.quit();
+                        logout();
+                    }
+                }
+                """).findings().stream().filter(item -> item.ruleId().equals("MIG-017")).findFirst().orElseThrow();
+
+        assertEquals(Finding.Status.MANUAL, finding.status());
+        assertEquals("Remove the driver setup; keep the rest.", finding.advice());
+    }
+
+    @Test
+    void ignoresQuitOnNonDriverReceiver() {
+        var report = new Analyzer().analyzeSource("class BaseTest { @AfterEach void tearDown() { browser.quit(); } }");
+        assertFalse(report.findings().stream().anyMatch(finding -> finding.ruleId().equals("MIG-017")));
     }
 
     @Test
@@ -45,6 +102,27 @@ class AnalyzerTest {
                 ((TakesScreenshot) d).getScreenshotAs(OutputType.FILE); } }""");
         assertTrue(r.contains("MIG-004"));
         assertTrue(r.contains("MIG-005"));
+    }
+
+    @Test
+    void detectsPageObjectsFindByFieldsAndPageFactoryCalls() {
+        var report = new Analyzer().analyzeSource("""
+            import org.openqa.selenium.support.FindBy;
+            class LoginPage {
+                @FindBy(id = "username") private WebElement username;
+                @org.openqa.selenium.support.FindBy(css = ".submit") private WebElement submit;
+                LoginPage(org.openqa.selenium.WebDriver driver) {
+                    org.openqa.selenium.support.PageFactory.initElements(driver, this);
+                }
+            }
+            class NotAPage { NotAPage(String name) {} }
+            """);
+
+        assertEquals(1, report.findings().stream().filter(f -> f.ruleId().equals("MIG-010")).count());
+        assertEquals(2, report.findings().stream().filter(f -> f.ruleId().equals("MIG-011")).count());
+        assertEquals(1, report.findings().stream().filter(f -> f.ruleId().equals("MIG-012")).count());
+        assertTrue(report.render().contains("MIG-010 (Page objects):"));
+        assertTrue(report.render().contains("MIG-011 (@FindBy fields):"));
     }
 
     @Test

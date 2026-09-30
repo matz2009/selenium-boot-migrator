@@ -1,0 +1,51 @@
+name: "🐛 Bug report"
+description: Report a defect in the migrator so we can reproduce and fix it.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! A minimal reproduction — ideally a small
+        Java file or project that triggers it — is the most helpful thing you can provide.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: "Running `analyze` on a project with a Gradle Kotlin DSL build file reports 0 dependencies, but it has several."
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The command you ran and the minimal input that triggers it.
+      placeholder: |
+        1. java -jar selenium-boot-migrator.jar analyze ./my-project
+        2. Project has a build.gradle.kts with `implementation("org.seleniumhq.selenium:selenium-java:4.21.0")`
+        3. Report says "No supported build descriptor found"
+    validations:
+      required: true
+  - type: input
+    id: migrator-version
+    attributes:
+      label: Migrator version
+      placeholder: "0.1.0-SNAPSHOT"
+    validations:
+      required: true
+  - type: input
+    id: java-version
+    attributes:
+      label: Java version
+      placeholder: "17.0.10 (Temurin)"
+    validations:
+      required: true
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stack trace / output
+      description: Paste the full output or stack trace if applicable. This will be rendered as code, no backticks needed.
+      render: shell
+    validations:
+      required: false
