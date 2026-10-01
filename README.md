@@ -12,10 +12,22 @@ your machine.
 
 ```bash
 mvn package
+
+# Text report (default)
 java -jar target/selenium-boot-migrator.jar analyze ./my-selenium-project
+
+# JSON output for tooling / CI
+java -jar target/selenium-boot-migrator.jar analyze ./my-selenium-project --format json
+
+# Enforce a minimum confidence threshold in CI
+java -jar target/selenium-boot-migrator.jar analyze ./my-selenium-project --fail-under 80
+
+# Combine format and threshold flags
+java -jar target/selenium-boot-migrator.jar analyze ./my-selenium-project --format json --fail-under 80
+
+# Apply mechanical migrations
 java -jar target/selenium-boot-migrator.jar migrate ./my-selenium-project --out ./my-selenium-project-migrated
 ```
-
 
 The output directory must not already exist and cannot be the source directory or one of its
 children. Migration output lists applied changes, compatibility notes, and any findings still
@@ -26,6 +38,187 @@ The estimate is a guide, not a guarantee. The report also lists dependencies fou
 `pom.xml` files and Gradle `build.gradle` / `build.gradle.kts` files. Gradle files are inspected
 as text; a Gradle installation is not required.
 
+### CLI Options
+
+#### `analyze <project-dir>`
+
+- `--format <text|json>`: Output format. Defaults to `text`.
+- `--fail-under <percent>`: Threshold percentage between `0` and `100`. If estimated confidence is strictly less than this threshold, the command exits with code `1`. The report is always printed before exiting.
+
+#### `migrate <project-dir> --out <output-dir>`
+
+- `--out <output-dir>`: Target directory for migrated copy. Must not already exist.
+
+### Exit Codes
+
+| Exit Code | Description |
+|---|---|
+| `0` | Success: command completed normally and estimated confidence meets `--fail-under` (if specified). |
+| `1` | Quality gate failed: estimated confidence is strictly below the `--fail-under` percentage. |
+| `2` | Usage or input error: invalid arguments, unsupported format, invalid threshold, missing directory, or directory not found. |
+| `3` | Runtime error: analysis or migration failed due to an I/O error or unexpected runtime failure. |
+
+
+## Machine-Readable Output (JSON)
+
+Use `--format json` to integrate analysis with CI pipelines, code review bots, and migration dashboards:
+
+```bash
+java -jar target/selenium-boot-migrator.jar analyze ./my-selenium-project --format json
+```
+
+### JSON Schema
+
+The output adheres to the following stable schema:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SeleniumBootMigrationReport",
+  "type": "object",
+  "required": [
+    "filesFound",
+    "filesParsed",
+    "unparsableFiles",
+    "detectedTechnologies",
+    "recognizedTechnologies",
+    "locatorCounts",
+    "summary",
+    "estimatedConfidence",
+    "findings"
+  ],
+  "properties": {
+    "filesFound": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of .java files discovered."
+    },
+    "filesParsed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of .java files successfully parsed."
+    },
+    "unparsableFiles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Normalized paths of files that could not be parsed."
+    },
+    "detectedTechnologies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Build systems and dependency coordinates detected."
+    },
+    "recognizedTechnologies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Recognized testing frameworks and libraries (e.g. Selenium 4.21.0, TestNG)."
+    },
+    "locatorCounts": {
+      "type": "object",
+      "additionalProperties": { "type": "integer" },
+      "description": "Counts per Selenium locator method (e.g. By.id, By.xpath)."
+    },
+    "summary": {
+      "type": "object",
+      "required": ["mapsCleanly", "manualReviewRequired", "unparsableFiles", "byRule"],
+      "properties": {
+        "mapsCleanly": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total count of AUTO findings that map cleanly to Selenium Boot."
+        },
+        "manualReviewRequired": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total count of MANUAL findings requiring human attention."
+        },
+        "unparsableFiles": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of unparsable source files."
+        },
+        "byRule": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" },
+          "description": "Counts of findings grouped by rule ID."
+        }
+      }
+    },
+    "estimatedConfidence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Confidence score percentage (0-100)."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ruleId", "status", "file", "line", "detected", "advice"],
+        "properties": {
+          "ruleId": { "type": "string", "description": "Migration rule ID (e.g. MIG-001)." },
+          "status": { "type": "string", "enum": ["AUTO", "MANUAL"], "description": "Mapping status." },
+          "file": { "type": "string", "description": "Normalized relative file path." },
+          "line": { "type": "integer", "minimum": 0, "description": "1-based line number of finding, or 0 if position is unavailable." },
+          "detected": { "type": "string", "description": "Code snippet or construct detected." },
+          "advice": { "type": "string", "description": "Suggested migration action." }
+        }
+      }
+    }
+  }
+}
+```
+
+### Example JSON Output
+
+```json
+{
+  "filesFound": 4,
+  "filesParsed": 4,
+  "unparsableFiles": [],
+  "detectedTechnologies": [
+    "Build system: Maven",
+    "Dependency: org.seleniumhq.selenium:selenium-java:4.21.0",
+    "Dependency: org.testng:testng:7.10.2"
+  ],
+  "recognizedTechnologies": [
+    "Selenium 4.21.0",
+    "TestNG"
+  ],
+  "locatorCounts": {
+    "By.id": 3,
+    "By.xpath": 1
+  },
+  "summary": {
+    "mapsCleanly": 1,
+    "manualReviewRequired": 1,
+    "unparsableFiles": 0,
+    "byRule": {
+      "MIG-001": 1,
+      "MIG-003": 1
+    }
+  },
+  "estimatedConfidence": 75,
+  "findings": [
+    {
+      "ruleId": "MIG-001",
+      "status": "AUTO",
+      "file": "src/test/java/DriverFactory.java",
+      "line": 12,
+      "detected": "ThreadLocal<WebDriver>",
+      "advice": "Delete the driver factory; extend BaseTest (per-thread isolation is built in)."
+    },
+    {
+      "ruleId": "MIG-003",
+      "status": "MANUAL",
+      "file": "src/test/java/LoginPage.java",
+      "line": 28,
+      "detected": "WebDriverWait / ExpectedConditions",
+      "advice": "Use $(locator) auto-wait or getWait(); review the condition by hand."
+    }
+  ]
+}
+```
 
 ## Rules
 

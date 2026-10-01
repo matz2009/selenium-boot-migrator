@@ -1,5 +1,6 @@
 package com.seleniumboot.migrator;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -59,6 +60,18 @@ public record Report(int filesFound, int filesParsed, List<String> unparsable, L
         unparsable.forEach(u -> sb.append("  [unparsable] ").append(u).append('\n'));
         return sb.toString();
     }
+
+    public Map<String, Long> ruleCounts() {
+        Map<String, Long> byRule = new TreeMap<>();
+        findings.forEach(f -> byRule.merge(f.ruleId(), 1L, Long::sum));
+        return Collections.unmodifiableMap(byRule);
+    }
+
+
+    public String toJson() {
+        return JsonRenderer.render(this);
+    }
+
 
     private static String ruleLabel(String ruleId) {
         return switch (ruleId) {
